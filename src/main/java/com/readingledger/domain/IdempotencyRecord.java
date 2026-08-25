@@ -21,8 +21,22 @@ public class IdempotencyRecord {
     @Column(nullable = false, length = 512)
     private String path;
 
-    @Column(name = "response_status", nullable = false)
-    private int responseStatus;
+    /**
+     * 请求体的 SHA-256 十六进制指纹。重放时路径与指纹必须同时匹配，
+     * 同一 key 被不同请求复用将被拒绝（409）。
+     */
+    @Column(name = "body_fingerprint", nullable = false, length = 64)
+    private String bodyFingerprint;
+
+    /**
+     * IN_PROGRESS：持有者已预留 key、请求仍在执行；
+     * COMPLETED：请求已成功完成，响应可安全重放。
+     */
+    @Column(nullable = false, length = 16)
+    private String state;
+
+    @Column(name = "response_status")
+    private Integer responseStatus;
 
     @Column(name = "response_body", columnDefinition = "text")
     private String responseBody;
@@ -54,11 +68,27 @@ public class IdempotencyRecord {
         this.path = path;
     }
 
-    public int getResponseStatus() {
+    public String getBodyFingerprint() {
+        return bodyFingerprint;
+    }
+
+    public void setBodyFingerprint(String bodyFingerprint) {
+        this.bodyFingerprint = bodyFingerprint;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public Integer getResponseStatus() {
         return responseStatus;
     }
 
-    public void setResponseStatus(int responseStatus) {
+    public void setResponseStatus(Integer responseStatus) {
         this.responseStatus = responseStatus;
     }
 
