@@ -7,6 +7,7 @@ import com.readingledger.web.dto.EditionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,10 +39,12 @@ public class EditionController {
     public ResponseEntity<EditionResponse> create(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CreateEditionRequest request,
+            HttpServletRequest httpRequest,
             UriComponentsBuilder uriBuilder) {
 
         var result = idempotencyService.execute(
-                idempotencyKey, request, EditionResponse.class,
+                idempotencyKey, httpRequest.getMethod(), httpRequest.getRequestURI(),
+                request, EditionResponse.class,
                 () -> {
                     EditionResponse body = editionService.create(request);
                     return com.readingledger.service.IdempotentResult.created(body);

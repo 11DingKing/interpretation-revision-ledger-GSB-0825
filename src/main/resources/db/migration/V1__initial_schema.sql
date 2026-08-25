@@ -56,8 +56,11 @@ CREATE INDEX idx_evidence_thread ON evidence_links(thread_id);
 CREATE TABLE idempotency_records (
     id               BIGSERIAL PRIMARY KEY,
     idempotency_key  VARCHAR(255) NOT NULL UNIQUE,
+    http_method      VARCHAR(10) NOT NULL,
+    request_path     VARCHAR(512) NOT NULL,
     request_hash     VARCHAR(64) NOT NULL,
-    response_body    TEXT NOT NULL,
-    status_code      INTEGER NOT NULL,
+    response_body    TEXT,
+    status_code      INTEGER,
+    status           VARCHAR(16) NOT NULL,
     created_at       TIMESTAMPTZ NOT NULL
 );

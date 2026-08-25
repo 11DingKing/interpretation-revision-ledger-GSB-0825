@@ -33,7 +33,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IdempotencyConflictException.class)
     public ResponseEntity<ErrorResponse> handleIdempotencyConflict(IdempotencyConflictException ex) {
-        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), null);
+        return build(HttpStatus.CONFLICT, ex.getMessage(), null);
     }
 
     @ExceptionHandler(HashMismatchException.class)

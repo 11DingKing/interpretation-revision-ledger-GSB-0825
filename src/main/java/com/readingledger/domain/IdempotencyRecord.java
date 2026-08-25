@@ -13,6 +13,9 @@ import java.time.Instant;
 @Table(name = "idempotency_records")
 public class IdempotencyRecord {
 
+    public static final String STATUS_PENDING = "PENDING";
+    public static final String STATUS_COMPLETED = "COMPLETED";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
@@ -21,14 +24,23 @@ public class IdempotencyRecord {
     @Column(name = "idempotency_key", nullable = false, unique = true)
     private String idempotencyKey;
 
+    @Column(name = "http_method", nullable = false)
+    private String httpMethod;
+
+    @Column(name = "request_path", nullable = false)
+    private String requestPath;
+
     @Column(name = "request_hash", nullable = false)
     private String requestHash;
 
-    @Column(name = "response_body", nullable = false)
+    @Column(name = "response_body")
     private String responseBody;
 
-    @Column(name = "status_code", nullable = false)
-    private int statusCode;
+    @Column(name = "status_code")
+    private Integer statusCode;
+
+    @Column(name = "status", nullable = false)
+    private String status;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -36,13 +48,22 @@ public class IdempotencyRecord {
     protected IdempotencyRecord() {
     }
 
-    public IdempotencyRecord(String idempotencyKey, String requestHash, String responseBody,
-                             int statusCode, Instant createdAt) {
+    public IdempotencyRecord(String idempotencyKey, String httpMethod, String requestPath,
+                             String requestHash, Instant createdAt) {
         this.idempotencyKey = idempotencyKey;
+        this.httpMethod = httpMethod;
+        this.requestPath = requestPath;
         this.requestHash = requestHash;
+        this.responseBody = null;
+        this.statusCode = null;
+        this.status = STATUS_PENDING;
+        this.createdAt = createdAt;
+    }
+
+    public void markCompleted(String responseBody, int statusCode) {
         this.responseBody = responseBody;
         this.statusCode = statusCode;
-        this.createdAt = createdAt;
+        this.status = STATUS_COMPLETED;
     }
 
     public Long getId() {
@@ -53,6 +74,14 @@ public class IdempotencyRecord {
         return idempotencyKey;
     }
 
+    public String getHttpMethod() {
+        return httpMethod;
+    }
+
+    public String getRequestPath() {
+        return requestPath;
+    }
+
     public String getRequestHash() {
         return requestHash;
     }
@@ -61,8 +90,16 @@ public class IdempotencyRecord {
         return responseBody;
     }
 
-    public int getStatusCode() {
+    public Integer getStatusCode() {
         return statusCode;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public boolean isCompleted() {
+        return STATUS_COMPLETED.equals(status);
     }
 
     public Instant getCreatedAt() {

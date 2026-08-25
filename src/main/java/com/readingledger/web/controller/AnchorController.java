@@ -9,6 +9,7 @@ import com.readingledger.web.dto.VerifyAnchorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,10 +42,12 @@ public class AnchorController {
             @PathVariable UUID editionId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CreateAnchorRequest request,
+            HttpServletRequest httpRequest,
             UriComponentsBuilder uriBuilder) {
 
         var result = idempotencyService.execute(
-                idempotencyKey, request, AnchorResponse.class,
+                idempotencyKey, httpRequest.getMethod(), httpRequest.getRequestURI(),
+                request, AnchorResponse.class,
                 () -> {
                     AnchorResponse body = anchorService.create(editionId, request);
                     return com.readingledger.service.IdempotentResult.created(body);

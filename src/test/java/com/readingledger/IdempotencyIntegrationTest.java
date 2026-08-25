@@ -6,12 +6,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -44,7 +52,7 @@ class IdempotencyIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void sameKeyDifferentPayload_returns422() {
+    void sameKeyDifferentPayload_returns409() {
         UUID editionId = createEdition();
         UUID anchorId = createAnchor(editionId);
         UUID threadId = createThread(anchorId);
@@ -64,8 +72,8 @@ class IdempotencyIntegrationTest extends AbstractIntegrationTest {
                 new HttpEntity<>(payload, headers),
                 JsonNode.class);
 
-        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, response.getStatusCode());
-        assertEquals(422, response.getBody().get("status").asInt());
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertEquals(409, response.getBody().get("status").asInt());
         assertNotNull(response.getBody().get("message").asText());
     }
 
@@ -87,20 +95,71 @@ class IdempotencyIntegrationTest extends AbstractIntegrationTest {
         assertEquals(1, count, "Edition should not be duplicated on replay");
     }
 
+    @Test
+    void concurrentSameKey_onlyOneSideEffect_allReturnSameResponse() throws Exception {
+        UUID editionId = createEdition();
+        UUID anchorId = createAnchor(editionId);
+        UUID threadId = createThread(anchorId);
+
+        String key = "idem-concurrent-" + UUID.randomUUID();
+        String body = "Concurrent hypothesis";
+        int concurrency = 5;
+
+        ExecutorService executor = Executors.newFixedThreadPool(concurrency);
+        CountDownLatch ready = new CountDownLatch(concurrency);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<ResponseEntity<JsonNode>>> futures = new ArrayList<>();
+
+        for (int i = 0; i < concurrency; i++) {
+            futures.add(executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return postRevisionForEntity(threadId, null, body, key);
+            }));
+        }
+
+        ready.await(5, TimeUnit.SECONDS);
+        start.countDown();
+
+        Set<String> revisionIds = new HashSet<>();
+        for (Future<ResponseEntity<JsonNode>> future : futures) {
+            ResponseEntity<JsonNode> response = future.get(30, TimeUnit.SECONDS);
+            assertEquals(HttpStatus.CREATED, response.getStatusCode(),
+                    "All concurrent requests should return 201: " + response.getBody());
+            revisionIds.add(response.getBody().get("revisionId").asText());
+        }
+
+        executor.shutdown();
+
+        assertEquals(1, revisionIds.size(),
+                "All " + concurrency + " concurrent requests should return the same revision ID, got: " + revisionIds);
+
+        JsonNode timeline = get("/api/threads/" + threadId + "/timeline");
+        assertEquals(1, timeline.get("revisions").size(),
+                "Only one revision should be created despite " + concurrency + " concurrent requests");
+    }
+
     private JsonNode postRevision(UUID threadId, UUID expectedHead, String body, String idemKey) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Content-Type", "application/json");
-        headers.set("Idempotency-Key", idemKey);
-        Map<String, Object> payload = new java.util.HashMap<>();
-        payload.put("body", body);
-        payload.put("expectedHeadRevision", expectedHead);
-        ResponseEntity<JsonNode> response = rest.postForEntity(
-                baseUrl() + "/api/threads/" + threadId + "/revisions",
-                new HttpEntity<>(payload, headers),
-                JsonNode.class);
+        ResponseEntity<JsonNode> response = postRevisionForEntity(threadId, expectedHead, body, idemKey);
         assertEquals(HttpStatus.CREATED, response.getStatusCode(),
                 "Revision creation failed: " + response.getBody());
         return response.getBody();
+    }
+
+    private ResponseEntity<JsonNode> postRevisionForEntity(UUID threadId, UUID expectedHead,
+                                                            String body, String idemKey) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Content-Type", "application/json");
+        if (idemKey != null) {
+            headers.set("Idempotency-Key", idemKey);
+        }
+        Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("body", body);
+        payload.put("expectedHeadRevision", expectedHead);
+        return rest.postForEntity(
+                baseUrl() + "/api/threads/" + threadId + "/revisions",
+                new HttpEntity<>(payload, headers),
+                JsonNode.class);
     }
 
     private JsonNode postEdition(String idemKey, String title, String label) {

@@ -7,6 +7,7 @@ import com.readingledger.web.dto.ThreadResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,10 +40,12 @@ public class ThreadController {
             @PathVariable UUID anchorId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CreateThreadRequest request,
+            HttpServletRequest httpRequest,
             UriComponentsBuilder uriBuilder) {
 
         var result = idempotencyService.execute(
-                idempotencyKey, request, ThreadResponse.class,
+                idempotencyKey, httpRequest.getMethod(), httpRequest.getRequestURI(),
+                request, ThreadResponse.class,
                 () -> {
                     ThreadResponse body = threadService.create(anchorId, request);
                     return com.readingledger.service.IdempotentResult.created(body);

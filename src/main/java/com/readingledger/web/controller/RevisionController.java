@@ -9,6 +9,7 @@ import com.readingledger.web.dto.RevisionResponse;
 import com.readingledger.web.dto.TimelineResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,10 +42,12 @@ public class RevisionController {
             @PathVariable UUID threadId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CreateRevisionRequest request,
+            HttpServletRequest httpRequest,
             UriComponentsBuilder uriBuilder) {
 
         IdempotentResult<RevisionResponse> result = idempotencyService.execute(
-                idempotencyKey, request, RevisionResponse.class,
+                idempotencyKey, httpRequest.getMethod(), httpRequest.getRequestURI(),
+                request, RevisionResponse.class,
                 () -> {
                     RevisionResponse body = revisionService.createRevision(threadId, request);
                     return IdempotentResult.created(body);
@@ -76,10 +79,12 @@ public class RevisionController {
     @Operation(summary = "Withdraw the current head revision")
     public ResponseEntity<RevisionResponse> withdraw(
             @PathVariable UUID id,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            HttpServletRequest httpRequest) {
 
         IdempotentResult<RevisionResponse> result = idempotencyService.execute(
-                idempotencyKey, id, RevisionResponse.class,
+                idempotencyKey, httpRequest.getMethod(), httpRequest.getRequestURI(),
+                id, RevisionResponse.class,
                 () -> {
                     RevisionResponse body = revisionService.withdraw(id);
                     return IdempotentResult.ok(body);
