@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: interpretation-revision-ledger
+  datasource:
+    url: jdbc:postgresql://localhost:5432/readingledger
+    username: ledger
+    password: ledger
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+app:
+  synthetic-data:
+    enabled: true
