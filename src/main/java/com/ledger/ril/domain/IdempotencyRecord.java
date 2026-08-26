@@ -33,10 +33,10 @@ public class IdempotencyRecord {
     @Column(name = "request_fingerprint", length = 64, nullable = false, updatable = false)
     private String requestFingerprint;
 
-    @Column(name = "response_status", nullable = false, updatable = false)
+    @Column(name = "response_status", nullable = false)
     private int responseStatus;
 
-    @Column(name = "response_body", nullable = false, updatable = false)
+    @Column(name = "response_body", nullable = false)
     private String responseBody;
 
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -54,6 +54,17 @@ public class IdempotencyRecord {
         this.responseStatus = responseStatus;
         this.responseBody = responseBody;
         this.createdAt = createdAt;
+    }
+
+    /**
+     * Fill in the response captured after the reserved action completed. The row is
+     * first inserted as a reservation (with a placeholder response) to claim the key
+     * atomically; once the action has run in the same transaction, its real response
+     * is written here before commit.
+     */
+    public void complete(int responseStatus, String responseBody) {
+        this.responseStatus = responseStatus;
+        this.responseBody = responseBody;
     }
 
     public String getIdemKey() {

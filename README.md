@@ -73,15 +73,16 @@ Disable seeding with `RIL_SEED_ENABLED=false`.
 
 Reads:
 - `GET  /api/editions`, `GET /api/editions/{id}`, `GET /api/editions/{id}/anchors`
+- `GET  /api/anchors/{id}`
 - `GET  /api/threads/{id}`, `GET /api/threads/{id}/timeline`
-- `GET  /api/threads/{id}/projection?asOf={revisionId}` — replay a past state of mind
+- `GET  /api/threads/{id}/projection/{revisionId}` — replay a past state of mind
 - `GET  /api/revisions/{id}`
 
 Writes (all accept `Idempotency-Key`):
 - `POST /api/editions`, `POST /api/editions/{id}/anchors`
 - `POST /api/threads`
 - `POST /api/threads/{id}/revisions` — append (body carries `expectedHeadRevision`)
-- `POST /api/threads/{id}/withdraw`
+- `POST /api/threads/{id}/withdrawals`
 
 ## Tests
 

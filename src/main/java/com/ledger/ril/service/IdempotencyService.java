@@ -1,7 +1,5 @@
 package com.ledger.ril.service;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -17,18 +15,25 @@ import org.springframework.stereotype.Service;
  * a given (key, method, path) runs the action and stores its response; replays
  * with the same key return that stored response verbatim; replays with a
  * different request body are rejected as a conflict.
+ *
+ * <p>Crucially, the key is <em>reserved before</em> the action runs, inside one
+ * atomic transaction (see {@link IdempotencyReservationRunner}). This closes the
+ * window where two concurrent same-key requests could both execute the business
+ * action and produce duplicate side effects: only the reservation winner runs;
+ * the loser blocks on the key, then replays the winner's stored response.
  */
 @Service
 public class IdempotencyService {
 
     private final IdempotencyRecordRepository records;
+    private final IdempotencyReservationRunner runner;
     private final ObjectMapper objectMapper;
-    private final Clock clock;
 
-    public IdempotencyService(IdempotencyRecordRepository records, ObjectMapper objectMapper, Clock clock) {
+    public IdempotencyService(IdempotencyRecordRepository records,
+                              IdempotencyReservationRunner runner, ObjectMapper objectMapper) {
         this.records = records;
+        this.runner = runner;
         this.objectMapper = objectMapper;
-        this.clock = clock;
     }
 
     /** Outcome of an idempotent write: the HTTP status and serialized JSON body to return. */
@@ -37,8 +42,8 @@ public class IdempotencyService {
 
     /**
      * Execute {@code action} under idempotency protection. When {@code idemKey} is
-     * null the action simply runs. The action returns the response payload object
-     * and the status to record.
+     * null the action simply runs. Otherwise the key is reserved before the action
+     * executes so that concurrent same-key requests cannot both take effect.
      */
     public Outcome execute(String idemKey, String method, String path, Object requestBody,
                            Supplier<ActionResult> action) {
@@ -49,31 +54,40 @@ public class IdempotencyService {
             return new Outcome(result.status(), serialize(result.body()));
         }
 
-        Optional<IdempotencyRecord> existing =
-                records.findByIdemKeyAndMethodAndPath(idemKey, method, path);
-        if (existing.isPresent()) {
-            IdempotencyRecord rec = existing.get();
-            if (!rec.getRequestFingerprint().equals(requestFingerprint)) {
-                throw new IdempotencyConflictException(idemKey);
-            }
-            return new Outcome(rec.getResponseStatus(), rec.getResponseBody());
+        // Fast path: an already-completed request replays without touching the DB writer.
+        Optional<Outcome> replay = replayIfPresent(idemKey, method, path, requestFingerprint);
+        if (replay.isPresent()) {
+            return replay.get();
         }
 
-        ActionResult result = action.get();
-        String body = serialize(result.body());
         try {
-            records.saveAndFlush(new IdempotencyRecord(idemKey, method, path, requestFingerprint,
-                    result.status(), body, Instant.now(clock)));
+            // Reserve the key and run the action in one atomic transaction. A concurrent
+            // duplicate blocks on the reserved row and then fails here; a business failure
+            // rolls the whole thing back, releasing the reservation.
+            return runner.reserveAndRun(idemKey, method, path, requestFingerprint,
+                    () -> action.get());
         } catch (DataIntegrityViolationException raced) {
-            // Concurrent first-use of the same key: fall back to the stored response.
-            IdempotencyRecord rec = records.findByIdemKeyAndMethodAndPath(idemKey, method, path)
+            // Someone else already reserved (and committed) this key: replay their response.
+            // If instead they rolled back, the record is gone and this is a genuine failure.
+            return replayIfPresent(idemKey, method, path, requestFingerprint)
                     .orElseThrow(() -> raced);
+        }
+    }
+
+    /**
+     * If a completed record exists for the key, return its response — validating the
+     * request body matches. Under READ COMMITTED isolation a reservation still in
+     * flight in another transaction is invisible here, so any record we observe has
+     * already been completed with its real response.
+     */
+    private Optional<Outcome> replayIfPresent(String idemKey, String method, String path,
+                                              String requestFingerprint) {
+        return records.findByIdemKeyAndMethodAndPath(idemKey, method, path).map(rec -> {
             if (!rec.getRequestFingerprint().equals(requestFingerprint)) {
                 throw new IdempotencyConflictException(idemKey);
             }
             return new Outcome(rec.getResponseStatus(), rec.getResponseBody());
-        }
-        return new Outcome(result.status(), body);
+        });
     }
 
     /** The result of a wrapped write action: what body to return and with what status. */
