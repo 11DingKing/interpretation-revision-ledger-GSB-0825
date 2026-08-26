@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: reading-interpretation-ledger
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ril}
+    username: ${SPRING_DATASOURCE_USERNAME:ril}
+    password: ${SPRING_DATASOURCE_PASSWORD:ril}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+# Seed synthetic sample data on startup (safe, idempotent). Disable with false.
+ril:
+  seed:
+    enabled: ${RIL_SEED_ENABLED:true}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+server:
+  port: ${SERVER_PORT:8080}

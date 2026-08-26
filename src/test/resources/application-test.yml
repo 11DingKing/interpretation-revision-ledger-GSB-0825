@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ril}
+    username: ${SPRING_DATASOURCE_USERNAME:ril}
+    password: ${SPRING_DATASOURCE_PASSWORD:ril}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    # Each test run starts from a clean schema against the compose database.
+    clean-disabled: false
+ril:
+  seed:
+    enabled: false
