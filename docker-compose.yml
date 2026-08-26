@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16
+    container_name: ril-db
+    environment:
+      POSTGRES_DB: ril
+      POSTGRES_USER: ril
+      POSTGRES_PASSWORD: ril
+    ports:
+      - "5432:5432"
+    volumes:
+      - ril-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ril -d ril"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ril-db-data:
