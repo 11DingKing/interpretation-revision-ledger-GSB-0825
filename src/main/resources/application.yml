@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: interpretation-revision-ledger
+  datasource:
+    url: jdbc:postgresql://localhost:5442/ledger
+    username: ledger
+    password: ledger
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

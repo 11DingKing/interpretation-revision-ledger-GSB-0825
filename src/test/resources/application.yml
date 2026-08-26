@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5442/ledger_test
+    username: ledger
+    password: ledger

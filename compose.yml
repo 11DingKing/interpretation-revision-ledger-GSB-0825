@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:16
+    container_name: ledger-db
+    environment:
+      POSTGRES_DB: ledger
+      POSTGRES_USER: ledger
+      POSTGRES_PASSWORD: ledger
+    ports:
+      - "5442:5432"
+    volumes:
+      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ledger -d ledger"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
